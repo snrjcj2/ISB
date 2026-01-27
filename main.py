@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 
 intents = discord.Intents.default()
 intents.members = True
-intents.message_content = True  # ← BURAYA
-
 bot = commands.Bot(command_prefix="!", intents=intents)
 
 # Toggle this: True for global sync (test), False for guild-only (production)
@@ -390,7 +388,7 @@ async def calibrate_uplink(interaction: discord.Interaction):
             synced = await bot.tree.sync()
             embed = discord.Embed(title="Uplink Calibrated", description=f"Successfully synced {len(synced)} command(s) globally.", color=0x00FF00)
         else:
-            guild = discord.Object(id=1465651730090954937)
+            guild = discord.Object(id=1465423063175790643)
             synced = await bot.tree.sync(guild=guild)
             embed = discord.Embed(title="Uplink Calibrated", description=f"Successfully synced {len(synced)} command(s) to the guild.", color=0x00FF00)
         embed.set_footer(text="Information extracted from ISB database.")
@@ -411,7 +409,7 @@ async def on_ready():
             synced = await bot.tree.sync()
             print(f"Successfully synced {len(synced)} command(s) globally.")
         else:
-            guild = discord.Object(id=1465651730090954937)
+            guild = discord.Object(id=1465423063175790643)
             synced = await bot.tree.sync(guild=guild)
             print(f"Successfully synced {len(synced)} command(s) to guild {guild.id}.")
         if len(synced) == 0:
