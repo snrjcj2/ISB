@@ -3,6 +3,9 @@ from discord.ext import commands
 from discord import app_commands
 import requests
 from datetime import datetime, timezone
+import matplotlib.pyplot as plt
+import io
+import os
 
 intents = discord.Intents.default()
 intents.members = True
@@ -103,6 +106,30 @@ def get_user_profile(user_id):
         print(f"Profile fetch error for user {user_id}: {e}")  # Log for debugging
         return "Unable to retrieve profile data. Please check the User ID."
 
+def get_user_badges_with_dates(user_id):
+    badges = []
+    url = f"https://badges.roblox.com/v1/users/{user_id}/badges"
+    params = {"limit": 100}
+    try:
+        while True:
+            response = requests.get(url, params=params, timeout=10)
+            if response.status_code != 200:
+                return f"Error fetching badges: {response.status_code}"
+            data = response.json()
+            for badge in data.get("data", []):
+                awarded_date = badge.get("awardedDate")
+                if awarded_date:
+                    date = datetime.fromisoformat(awarded_date[:-1]).replace(tzinfo=timezone.utc)
+                    badges.append(date)
+            next_cursor = data.get("nextPageCursor")
+            if not next_cursor:
+                break
+            params["cursor"] = next_cursor
+    except Exception as e:
+        print(f"Badges fetch error for user {user_id}: {e}")  # Log for debugging
+        return "Unable to retrieve badge data. Please check the User ID."
+    return sorted(badges)  # Sort by date
+
 def get_user_groups(user_id):
     groups = []
     url = f"https://groups.roblox.com/v1/users/{user_id}/groups"
@@ -124,8 +151,7 @@ def get_user_groups(user_id):
                 break
             params["cursor"] = next_cursor
     except Exception as e:
-        print(f"Groups fetch error for user {user_id}: {e}")  # Log for debugging
-        return "Unable to retrieve group data. Please check the User ID."
+        return f"Network error fetching groups: {e}"
     return groups
 
 def compare_users(user_id_1, user_id_2):
@@ -282,9 +308,9 @@ async def profile_intel(interaction: discord.Interaction, user_id: int):
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
-    groups = get_user_groups(user_id)
+    groups = get_user_    groups = get_user_groups(user_id)
     if isinstance(groups, str):
-        embed = discord.Embed(title="Error", description=groups, color=0xFF0000)
+        embed = discord.Embed(title="Error", description="Unable to retrieve group data. Please check the User ID.", color=0xFF0000)
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
@@ -306,6 +332,50 @@ async def profile_intel(interaction: discord.Interaction, user_id: int):
     embed.add_field(name="Risk Factors", value=', '.join(profile['risk_factors']) if profile['risk_factors'] else 'None', inline=False)
     embed.set_footer(text="Information extracted from ISB database.")
     await interaction.followup.send(embed=embed)
+
+@bot.tree.command(name="badge_info", description="Generate a badge graph for a Roblox user.")
+@app_commands.describe(user_id="Roblox User ID")
+async def badge_info(interaction: discord.Interaction, user_id: int):
+    await interaction.response.defer()
+    profile = get_user_profile(user_id)
+    if isinstance(profile, str):
+        embed = discord.Embed(title="Error", description=profile, color=0xFF0000)
+        embed.set_footer(text="Information extracted from ISB database.")
+        await interaction.followup.send(embed=embed)
+        return
+    badges_dates = get_user_badges_with_dates(user_id)
+    if isinstance(badges_dates, str):
+        embed = discord.Embed(title="Error", description=badges_dates, color=0xFF0000)
+        embed.set_footer(text="Information extracted from ISB database.")
+        await interaction.followup.send(embed=embed)
+        return
+    if not badges_dates:
+        embed = discord.Embed(title="No Badges", description=f"{profile['username']} has no badges.", color=0xC0C0C0)
+        embed.set_footer(text="Information extracted from ISB database.")
+        await interaction.followup.send(embed=embed)
+        return
+    # Generate graph
+    dates = [d.date() for d in badges_dates]
+    cumulative = list(range(1, len(dates) + 1))
+    plt.figure(figsize=(10, 6))
+    plt.plot(dates, cumulative, marker='o', color='#C0C0C0', linewidth=2, markersize=5)
+    plt.fill_between(dates, cumulative, color='#E5E5E5', alpha=0.5)
+    plt.title(f"Badge Progression for {profile['username']}", fontsize=16, color='#808080')
+    plt.xlabel('Awarded Date', fontsize=12, color='#808080')
+    plt.ylabel('Cumulative Badge Count', fontsize=12, color='#808080')
+    plt.xticks(rotation=45, color='#808080')
+    plt.yticks(color='#808080')
+    plt.grid(True, color='#D3D3D3', linestyle='--', alpha=0.7)
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png', facecolor='#F5F5F5')
+    buf.seek(0)
+    plt.close()
+    file = discord.File(buf, 'badge_graph.png')
+    embed = discord.Embed(title=f"Badge Graph for {profile['username']}", color=0xC0C0C0)
+    embed.set_image(url="attachment://badge_graph.png")
+    embed.set_footer(text="Information extracted from ISB database.")
+    await interaction.followup.send(embed=embed, file=file)
 
 @bot.tree.command(name="tge_user_lookup", description="Lookup Discord user info by username or ID in this server.")
 @app_commands.describe(user_input="Discord Username or User ID")
@@ -388,7 +458,7 @@ async def calibrate_uplink(interaction: discord.Interaction):
             synced = await bot.tree.sync()
             embed = discord.Embed(title="Uplink Calibrated", description=f"Successfully synced {len(synced)} command(s) globally.", color=0x00FF00)
         else:
-            guild = discord.Object(id=1465423063175790643)
+            guild = discord.Object(id=YOUR_GUILD_ID_HERE)
             synced = await bot.tree.sync(guild=guild)
             embed = discord.Embed(title="Uplink Calibrated", description=f"Successfully synced {len(synced)} command(s) to the guild.", color=0x00FF00)
         embed.set_footer(text="Information extracted from ISB database.")
@@ -409,7 +479,7 @@ async def on_ready():
             synced = await bot.tree.sync()
             print(f"Successfully synced {len(synced)} command(s) globally.")
         else:
-            guild = discord.Object(id=1465423063175790643)
+            guild = discord.Object(id=YOUR_GUILD_ID_HERE)
             synced = await bot.tree.sync(guild=guild)
             print(f"Successfully synced {len(synced)} command(s) to guild {guild.id}.")
         if len(synced) == 0:
@@ -418,5 +488,4 @@ async def on_ready():
         print(f"Failed to sync commands on ready: {e}. Ensure bot has permissions and is in the guild.")
 
 # --- Run the bot ---
-import os
 bot.run(os.environ.get('TOKEN'))
