@@ -308,7 +308,7 @@ async def profile_intel(interaction: discord.Interaction, user_id: int):
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
-    groups = get_user_    groups = get_user_groups(user_id)
+    groups = get_user_groups(user_id)
     if isinstance(groups, str):
         embed = discord.Embed(title="Error", description="Unable to retrieve group data. Please check the User ID.", color=0xFF0000)
         embed.set_footer(text="Information extracted from ISB database.")
@@ -489,3 +489,4 @@ async def on_ready():
 
 # --- Run the bot ---
 bot.run(os.environ.get('TOKEN'))
+
