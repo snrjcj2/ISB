@@ -106,7 +106,7 @@ def get_user_profile(user_id):
         print(f"Profile fetch error for user {user_id}: {e}")  # Log for debugging
         return "Unable to retrieve profile data. Please check the User ID."
 
-def get_user_badges_with_dates(user_id):
+def get_user_badges_full(user_id):
     badges = []
     url = f"https://badges.roblox.com/v1/users/{user_id}/badges"
     params = {"limit": 100}
@@ -117,10 +117,10 @@ def get_user_badges_with_dates(user_id):
                 return f"Error fetching badges: {response.status_code}"
             data = response.json()
             for badge in data.get("data", []):
+                name = badge.get("name", "Unknown")
                 awarded_date = badge.get("awardedDate")
-                if awarded_date:
-                    date = datetime.fromisoformat(awarded_date[:-1]).replace(tzinfo=timezone.utc)
-                    badges.append(date)
+                date = datetime.fromisoformat(awarded_date[:-1]).replace(tzinfo=timezone.utc) if awarded_date else None
+                badges.append({"name": name, "date": date})
             next_cursor = data.get("nextPageCursor")
             if not next_cursor:
                 break
@@ -128,7 +128,7 @@ def get_user_badges_with_dates(user_id):
     except Exception as e:
         print(f"Badges fetch error for user {user_id}: {e}")  # Log for debugging
         return "Unable to retrieve badge data. Please check the User ID."
-    return sorted(badges)  # Sort by date
+    return badges
 
 def get_user_groups(user_id):
     groups = []
@@ -336,23 +336,22 @@ async def profile_intel(interaction: discord.Interaction, user_id: int):
 @bot.tree.command(name="badge_info", description="Generate a badge graph for a Roblox user.")
 @app_commands.describe(user_id="Roblox User ID")
 async def badge_info(interaction: discord.Interaction, user_id: int):
-    await interaction.response.defer()
     profile = get_user_profile(user_id)
     if isinstance(profile, str):
         embed = discord.Embed(title="Error", description=profile, color=0xFF0000)
         embed.set_footer(text="Information extracted from ISB database.")
-        await interaction.followup.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
         return
     badges = get_user_badges_full(user_id)
     if isinstance(badges, str):
         embed = discord.Embed(title="Error", description=badges, color=0xFF0000)
         embed.set_footer(text="Information extracted from ISB database.")
-        await interaction.followup.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
         return
     if not badges:
         embed = discord.Embed(title=f"Badge Info for {profile['username']}", description="No badges found.", color=0xC0C0C0)
         embed.set_footer(text="Information extracted from ISB database.")
-        await interaction.followup.send(embed=embed)
+        await interaction.response.send_message(embed=embed)
         return
     # Prepare data
     total_badges = len(badges)
@@ -385,7 +384,7 @@ async def badge_info(interaction: discord.Interaction, user_id: int):
         file = discord.File(buf, 'badge_graph.png')
         embed.set_image(url="attachment://badge_graph.png")
     embed.set_footer(text="Information extracted from ISB database.")
-    await interaction.followup.send(embed=embed, file=file if badges_with_dates else None)
+    await interaction.response.send_message(embed=embed, file=file if badges_with_dates else None)
 
 @bot.tree.command(name="tge_user_lookup", description="Lookup Discord user info by username or ID in this server.")
 @app_commands.describe(user_input="Discord Username or User ID")
@@ -499,6 +498,3 @@ async def on_ready():
 
 # --- Run the bot ---
 bot.run(os.environ.get('TOKEN'))
-
-
-
