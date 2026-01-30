@@ -383,8 +383,11 @@ async def badge_info(interaction: discord.Interaction, user_id: int):
         plt.close()
         file = discord.File(buf, 'badge_graph.png')
         embed.set_image(url="attachment://badge_graph.png")
-    embed.set_footer(text="Information extracted from ISB database.")
-    await interaction.response.send_message(embed=embed, file=file if badges_with_dates else None)
+        embed.set_footer(text="Information extracted from ISB database.")
+        await interaction.response.send_message(embed=embed, file=file)
+    else:
+        embed.set_footer(text="Information extracted from ISB database.")
+        await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="tge_user_lookup", description="Lookup Discord user info by username or ID in this server.")
 @app_commands.describe(user_input="Discord Username or User ID")
@@ -498,3 +501,4 @@ async def on_ready():
 
 # --- Run the bot ---
 bot.run(os.environ.get('TOKEN'))
+
