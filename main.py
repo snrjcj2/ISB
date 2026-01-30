@@ -350,7 +350,8 @@ async def badge_info(interaction: discord.Interaction, user_id: int):
         await interaction.followup.send(embed=embed)
         return
     if not badges_dates:
-        embed = discord.Embed(title="No Badges", description=f"{profile['username']} has no badges.", color=0xC0C0C0)
+        # Fallback: Show total badges without graph
+        embed = discord.Embed(title=f"Badge Info for {profile['username']}", description=f"Total Badges: {profile['total_badges']}\nNo awarded dates available for graph.", color=0xC0C0C0)
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
@@ -489,4 +490,5 @@ async def on_ready():
 
 # --- Run the bot ---
 bot.run(os.environ.get('TOKEN'))
+
 
