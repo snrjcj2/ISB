@@ -343,40 +343,49 @@ async def badge_info(interaction: discord.Interaction, user_id: int):
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
-    badges_dates = get_user_badges_with_dates(user_id)
-    if isinstance(badges_dates, str):
-        embed = discord.Embed(title="Error", description=badges_dates, color=0xFF0000)
+    badges = get_user_badges_full(user_id)
+    if isinstance(badges, str):
+        embed = discord.Embed(title="Error", description=badges, color=0xFF0000)
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
-    if not badges_dates:
-        # Fallback: Show total badges without graph
-        embed = discord.Embed(title=f"Badge Info for {profile['username']}", description=f"Total Badges: {profile['total_badges']}\nNo awarded dates available for graph.", color=0xC0C0C0)
+    if not badges:
+        embed = discord.Embed(title=f"Badge Info for {profile['username']}", description="No badges found.", color=0xC0C0C0)
         embed.set_footer(text="Information extracted from ISB database.")
         await interaction.followup.send(embed=embed)
         return
-    # Generate graph
-    dates = [d.date() for d in badges_dates]
-    cumulative = list(range(1, len(dates) + 1))
-    plt.figure(figsize=(10, 6))
-    plt.plot(dates, cumulative, marker='o', color='#C0C0C0', linewidth=2, markersize=5)
-    plt.fill_between(dates, cumulative, color='#E5E5E5', alpha=0.5)
-    plt.title(f"Badge Progression for {profile['username']}", fontsize=16, color='#808080')
-    plt.xlabel('Awarded Date', fontsize=12, color='#808080')
-    plt.ylabel('Cumulative Badge Count', fontsize=12, color='#808080')
-    plt.xticks(rotation=45, color='#808080')
-    plt.yticks(color='#808080')
-    plt.grid(True, color='#D3D3D3', linestyle='--', alpha=0.7)
-    plt.tight_layout()
-    buf = io.BytesIO()
-    plt.savefig(buf, format='png', facecolor='#F5F5F5')
-    buf.seek(0)
-    plt.close()
-    file = discord.File(buf, 'badge_graph.png')
-    embed = discord.Embed(title=f"Badge Graph for {profile['username']}", color=0xC0C0C0)
-    embed.set_image(url="attachment://badge_graph.png")
+    # Prepare data
+    total_badges = len(badges)
+    badges_with_dates = [b for b in badges if b["date"]]
+    badges_without_dates = [b for b in badges if not b["date"]]
+    description = f"**Total Badges:** {total_badges}\n"
+    if badges_with_dates:
+        description += "**Badges with Dates:**\n" + "\n".join([f"- {b['name']}: {b['date'].strftime('%Y-%m-%d')}" for b in badges_with_dates[:20]])  # Limit to 20 for embed
+    if badges_without_dates:
+        description += "\n**Badges without Dates:**\n" + "\n".join([f"- {b['name']}" for b in badges_without_dates[:20]])
+    embed = discord.Embed(title=f"Badge Info for {profile['username']}", description=description, color=0xC0C0C0)
+    if badges_with_dates:
+        # Generate graph for badges with dates
+        dates = sorted([b["date"].date() for b in badges_with_dates])
+        cumulative = list(range(1, len(dates) + 1))
+        plt.figure(figsize=(10, 6))
+        plt.plot(dates, cumulative, marker='o', color='#C0C0C0', linewidth=2, markersize=5)
+        plt.fill_between(dates, cumulative, color='#E5E5E5', alpha=0.5)
+        plt.title(f"Badge Progression for {profile['username']}", fontsize=16, color='#808080')
+        plt.xlabel('Awarded Date', fontsize=12, color='#808080')
+        plt.ylabel('Cumulative Badge Count', fontsize=12, color='#808080')
+        plt.xticks(rotation=45, color='#808080')
+        plt.yticks(color='#808080')
+        plt.grid(True, color='#D3D3D3', linestyle='--', alpha=0.7)
+        plt.tight_layout()
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', facecolor='#F5F5F5')
+        buf.seek(0)
+        plt.close()
+        file = discord.File(buf, 'badge_graph.png')
+        embed.set_image(url="attachment://badge_graph.png")
     embed.set_footer(text="Information extracted from ISB database.")
-    await interaction.followup.send(embed=embed, file=file)
+    await interaction.followup.send(embed=embed, file=file if badges_with_dates else None)
 
 @bot.tree.command(name="tge_user_lookup", description="Lookup Discord user info by username or ID in this server.")
 @app_commands.describe(user_input="Discord Username or User ID")
@@ -490,5 +499,6 @@ async def on_ready():
 
 # --- Run the bot ---
 bot.run(os.environ.get('TOKEN'))
+
 
 
